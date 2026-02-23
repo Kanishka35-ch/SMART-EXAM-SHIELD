@@ -103,6 +103,13 @@ export default function App() {
     status: 'In Progress'
   });
 
+  const [newQuestions, setNewQuestions] = useState<Question[]>([]);
+  const [currentNewQuestion, setCurrentNewQuestion] = useState<{ text: string; options: string[]; correct: number }>({
+    text: '',
+    options: ['', '', '', ''],
+    correct: 0
+  });
+
   // --- Effects ---
   useEffect(() => {
     const savedUser = localStorage.getItem('examiner');
@@ -192,12 +199,10 @@ export default function App() {
     const title = formData.get('title');
     const duration = parseInt(formData.get('duration') as string);
     
-    // Simple question parsing logic for demo
-    const questions = [
-      { text: "What is the primary goal of IntegrityShield?", options: ["Ease of use", "Academic Integrity", "Fun", "Speed"], correct: 1 },
-      { text: "Which protocol is used for secure communication?", options: ["HTTP", "FTP", "HTTPS", "SMTP"], correct: 2 },
-      { text: "What happens on the second violation in this system?", options: ["Warning", "Nothing", "Auto-termination", "Score reduction"], correct: 2 }
-    ];
+    if (newQuestions.length === 0) {
+      alert('Please add at least one question');
+      return;
+    }
 
     const res = await fetch('/api/exam/create', {
       method: 'POST',
@@ -205,10 +210,11 @@ export default function App() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${user?.token}`
       },
-      body: JSON.stringify({ title, duration, questions })
+      body: JSON.stringify({ title, duration, questions: newQuestions })
     });
 
     if (res.ok) {
+      setNewQuestions([]);
       setView('dashboard');
     }
   };
@@ -525,7 +531,7 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-2xl mx-auto"
+              className="max-w-3xl mx-auto"
             >
               <Card className="p-8">
                 <div className="flex items-center gap-4 mb-8">
@@ -534,29 +540,110 @@ export default function App() {
                   </Button>
                   <h2 className="text-2xl font-bold">Create New Examination</h2>
                 </div>
-                <form className="space-y-6" onSubmit={createExam}>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Exam Title</label>
-                    <Input name="title" placeholder="e.g. Computer Science Final 2024" required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Duration (minutes)</label>
-                    <Input name="duration" type="number" placeholder="60" required />
-                  </div>
-                  
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <h4 className="font-bold mb-2 flex items-center gap-2">
-                      <AlertTriangle size={18} className="text-amber-500" />
-                      Demo Mode
-                    </h4>
-                    <p className="text-sm text-slate-600">
-                      In this demo version, creating an exam will automatically populate it with 3 sample questions 
-                      related to IntegrityShield and security.
-                    </p>
+                
+                <form className="space-y-8" onSubmit={createExam}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Exam Title</label>
+                      <Input name="title" placeholder="e.g. Computer Science Final 2024" required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Duration (minutes)</label>
+                      <Input name="duration" type="number" placeholder="60" required />
+                    </div>
                   </div>
 
-                  <Button className="w-full bg-indigo-600 text-white hover:bg-indigo-700 py-3">
-                    Generate & Publish Exam
+                  <div className="border-t border-slate-100 pt-8">
+                    <h3 className="text-lg font-bold mb-4">Questions ({newQuestions.length})</h3>
+                    
+                    {/* Question List */}
+                    <div className="space-y-4 mb-8">
+                      {newQuestions.map((q, idx) => (
+                        <div key={idx} className="p-4 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-slate-800">{idx + 1}. {q.text}</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {q.options.length} options • Correct: {q.options[q.correct]}
+                            </p>
+                          </div>
+                          <button 
+                            type="button"
+                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                            onClick={() => setNewQuestions(newQuestions.filter((_, i) => i !== idx))}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add Question Form */}
+                    <div className="p-6 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-4">
+                      <h4 className="font-bold text-indigo-900 flex items-center gap-2">
+                        <Plus size={18} /> Add Question
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-indigo-700 uppercase">Question Text</label>
+                        <Input 
+                          value={currentNewQuestion.text}
+                          onChange={e => setCurrentNewQuestion({ ...currentNewQuestion, text: e.target.value })}
+                          placeholder="What is the capital of France?" 
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {currentNewQuestion.options.map((opt, i) => (
+                          <div key={i} className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Option {i + 1}</label>
+                            <div className="flex gap-2">
+                              <Input 
+                                value={opt}
+                                onChange={e => {
+                                  const newOpts = [...currentNewQuestion.options];
+                                  newOpts[i] = e.target.value;
+                                  setCurrentNewQuestion({ ...currentNewQuestion, options: newOpts });
+                                }}
+                                placeholder={`Option ${i + 1}`} 
+                              />
+                              <button
+                                type="button"
+                                className={cn(
+                                  "p-2 rounded-lg border-2 transition-all",
+                                  currentNewQuestion.correct === i 
+                                    ? "bg-emerald-500 border-emerald-500 text-white" 
+                                    : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                                )}
+                                onClick={() => setCurrentNewQuestion({ ...currentNewQuestion, correct: i })}
+                                title="Mark as correct"
+                              >
+                                <CheckCircle2 size={18} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <Button 
+                        type="button"
+                        className="w-full bg-indigo-600 text-white hover:bg-indigo-700"
+                        onClick={() => {
+                          if (!currentNewQuestion.text || currentNewQuestion.options.some(o => !o)) {
+                            alert('Please fill in question and all options');
+                            return;
+                          }
+                          setNewQuestions([...newQuestions, currentNewQuestion]);
+                          setCurrentNewQuestion({
+                            text: '',
+                            options: ['', '', '', ''],
+                            correct: 0
+                          });
+                        }}
+                      >
+                        Add to Exam
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700 py-4 text-lg font-bold shadow-lg shadow-emerald-100">
+                    Publish Examination
                   </Button>
                 </form>
               </Card>
